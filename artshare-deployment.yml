@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: artshare-deployment
+    labels:
+        app: artshare
+spec:
+    replicas: 3
+    selector:
+        matchLabels:
+            app: artshare
+    template:
+        metadata:
+            labels:
+                app: artshare
+        spec:
+            containers:
+                -   name: frontend
+                    image: russboshep/react-nginx-test-kube:latest
+                    ports:
+                        -   containerPort: 80
+                -   name: backend
+                    image: russboshep/flask-gunicorn-test:latest
+                    ports:
+                        -   containerPort: 8000
