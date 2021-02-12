@@ -6,12 +6,20 @@ metadata:
         nginx.ingress.kubernetes.io/rewrite-target: /$1
 spec:
     rules:
-        -   http:
+        -   host: "artshare.jeff"
+            http:
                 paths:
-                    -   path: /
+                    -   path: /?(.*)
                         pathType: Prefix
                         backend:
                             service:
                                 name: artshare-service
                                 port:
                                     number: 80
+                    -   path: /api/?(.*)
+                        pathType: Prefix
+                        backend:
+                            service:
+                                name: artshare-service
+                                port:
+                                    number: 8000
