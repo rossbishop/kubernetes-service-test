@@ -144,13 +144,13 @@ def requires_auth(f):
 
 @APP.route('/time')
 @cross_origin(headers=["Content-Type", "Authorization"])
-@cross_origin(headers=["Access-Control-Allow-Origin", "http://artshare.jeff"])
+@cross_origin(headers=["Access-Control-Allow-Origin", "http://localhost"])
 def get_current_time():
     return {'time': time.time()}
 
 @APP.route("/public")
 @cross_origin(headers=["Content-Type", "Authorization"])
-@cross_origin(headers=["Access-Control-Allow-Origin", "http://artshare.jeff"])
+@cross_origin(headers=["Access-Control-Allow-Origin", "http://localhost"])
 def public():
     """No access token required to access this route
     """
@@ -160,7 +160,7 @@ def public():
 
 @APP.route("/private")
 @cross_origin(headers=["Content-Type", "Authorization"])
-@cross_origin(headers=["Access-Control-Allow-Origin", "http://artshare.jeff"])
+@cross_origin(headers=["Access-Control-Allow-Origin", "http://localhost"])
 @requires_auth
 def private():
     """A valid access token is required to access this route
@@ -170,7 +170,7 @@ def private():
 
 @APP.route("/private-scoped")
 @cross_origin(headers=["Content-Type", "Authorization"])
-@cross_origin(headers=["Access-Control-Allow-Origin", "http://artshare.jeff"])
+@cross_origin(headers=["Access-Control-Allow-Origin", "http://localhost"])
 @requires_auth
 def private_scoped():
     """A valid access token and an appropriate scope are required to access this route

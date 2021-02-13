@@ -6,8 +6,7 @@ metadata:
         nginx.ingress.kubernetes.io/rewrite-target: /$1
 spec:
     rules:
-        -   host: "artshare.jeff"
-            http:
+        -   http:
                 paths:
                     -   path: /?(.*)
                         pathType: Prefix
