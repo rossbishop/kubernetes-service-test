@@ -4,7 +4,13 @@ metadata:
     name: artshare-ingress
     annotations:
         nginx.ingress.kubernetes.io/rewrite-target: /$1
+        nginx.ingress.kubernetes.io/service-upstream: "true"
+
 spec:
+    tls:
+    -   hosts:
+        -   artsharedev.com
+        secretName: artshare-tls
     rules:
         -   http:
                 paths:
@@ -22,3 +28,4 @@ spec:
                                 name: artshare-service
                                 port:
                                     number: 8000
+

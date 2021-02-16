@@ -11,6 +11,8 @@ ReactDOM.render(
     domain="dev-artsite.eu.auth0.com"
     clientId="RhpGUoMtR5bfQWFNJ19u7TfB63Le8o3d"
     redirectUri={window.location.origin}
+    audience="https://dev-artsite.eu.auth0.com/api/v2/"
+    scope="read:current_user update:current_user_metadata"
   >
     <React.StrictMode>
       <Wrapper>

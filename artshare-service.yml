@@ -3,7 +3,7 @@ kind: Service
 metadata:
     name: artshare-service
 spec:
-    type: NodePort
+    #type: NodePort
     selector:
         app: artshare
     ports:
