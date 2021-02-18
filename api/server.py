@@ -12,15 +12,25 @@ from flask_cors import cross_origin
 from jose import jwt
 
 import time
+from time import gmtime, strftime
+
+import boto3
+import uuid
 
 ENV_FILE = find_dotenv()
 if ENV_FILE:
     load_dotenv(ENV_FILE)
-AUTH0_DOMAIN = env.get("AUTH0_DOMAIN")
-API_IDENTIFIER = env.get("API_IDENTIFIER")
+#AUTH0_DOMAIN = env.get("AUTH0_DOMAIN")
+AUTH0_DOMAIN = "dev-artsite.eu.auth0.com"
+#API_IDENTIFIER = env.get("API_IDENTIFIER")
+API_IDENTIFIER = "testapi"
 ALGORITHMS = ["RS256"]
 APP = Flask(__name__)
 
+dynamodb = boto3.resource('dynamodb', region_name='eu-west-2')
+# create dynamodb table object connected to projects table
+table = dynamodb.Table('ArtShare-Projects')
+tableName = "ArtShare-Projects"
 
 # Format error response and append status code.
 class AuthError(Exception):
@@ -140,17 +150,146 @@ def requires_auth(f):
     return decorated
 
 
+# REST API
+
+# LOOK INTO SANITIZATION OF INCOMING DATA
+
+@APP.route('/project/<id>', methods=["GET"])
+@cross_origin(headers=["Content-Type", "Authorization"])
+def getProject(id):
+    if request.method == "GET":
+        response = table.get_item(
+            TableName=tableName,
+            Key={'id':str(id)}
+        )
+        return {
+            'isBase64Encoded': "false",
+            'statusCode': 200,
+            'headers':{
+                "Content-Type": "application/json"
+            },
+            'body': json.dumps(response['Item'])
+        }
+    else:
+        return {"UWOTSUN": "That ain't right"}
+
+@APP.route('/project/<id>', methods=["PUT", "DELETE"])
+@cross_origin(headers=["Content-Type", "Authorization"])
+@requires_auth
+def modifyProject(id):
+    if request.method == "PUT":
+        response = table.get_item(
+            TableName=tableName,
+            Key={'id':str(id)}
+        )
+    
+        request.get_data()
+        requestData = request.json
+
+        # store the current time in a human readable format in a variable
+        now = strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime())
+
+        #print(response['Item']['owner'])
+
+        # Then check the owner name is the same as that in the access token
+        #if response['Item']['owner'] == user['Username']:
+        
+        # Make the desired changes
+        response = table.update_item(
+            TableName=tableName,
+            Key={'id':str(id)},
+            UpdateExpression="set projectName = :pn, projectDescription = :pd, updatedAt = :t",
+            ExpressionAttributeValues={
+                ':pn': requestData['projectName'],
+                ':pd': requestData['projectDescription'],
+                ':t': now
+            },
+            ReturnValues="UPDATED_NEW"
+        )
+        return {
+            'isBase64Encoded': "false",
+            'statusCode': 200,
+            'headers':{
+                "Content-Type": "application/json"
+            },
+            'body': json.dumps(response)
+        }
+    elif request.method == "DELETE":
+        # First get the project
+        response = table.get_item(
+            TableName=tableName,
+            Key={'id':str(id)}
+        )
+    
+        # Then check the owner name is the same as that in the access token
+        #if response['Item']['owner'] == user['Username']:
+
+        # Make the deletion
+        response = table.delete_item(
+            TableName=tableName,
+            Key={'id':str(id)}
+        )
+        return {
+            'isBase64Encoded': "false",
+            'statusCode': 200,
+            'headers':{
+                "Content-Type": "application/json"
+            },
+            'body': json.dumps(response)
+        }
+    else:
+        return {"UWOTSUN": "That ain't right"}
+
+@APP.route('/project', methods=["POST"])
+@cross_origin(headers=["Content-Type", "Authorization"])
+@requires_auth
+def createProject():
+    if request.method == "POST":
+        request.get_data()
+        requestData = request.json
+
+        # store the current time in a human readable format in a variable
+        now = strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime())
+
+        id = uuid.uuid4()
+        owner = "Jeff"
+        projectName = requestData['projectName']
+        projectDescription = requestData['projectDescription']
+        contentType = "project"
+        createdAt = now
+        updatedAt = now
+        
+        # write name and time to the DynamoDB table using the object we instantiated and save response in a variable
+        response = table.put_item(
+            Item={
+                'id': str(id),
+                'owner': owner,
+                'projectName': projectName,
+                'projectDescription': projectDescription,
+                'contentType': contentType,
+                'createdAt': createdAt,
+                'updatedAt': updatedAt
+            })
+        return {
+            'isBase64Encoded': "false",
+            'statusCode': 200,
+            'headers':{
+                "Content-Type": "application/json"
+            },
+            'body': str(id)
+        }
+    else:
+        return {"UWOTSUN": "That ain't right"}
+
 # Controllers API
 
 @APP.route('/time')
 @cross_origin(headers=["Content-Type", "Authorization"])
-@cross_origin(headers=["Access-Control-Allow-Origin", "http://localhost"])
 def get_current_time():
     return {'time': time.time()}
 
 @APP.route("/public")
 @cross_origin(headers=["Content-Type", "Authorization"])
-@cross_origin(headers=["Access-Control-Allow-Origin", "http://localhost"])
 def public():
     """No access token required to access this route
     """
@@ -160,7 +299,6 @@ def public():
 
 @APP.route("/private")
 @cross_origin(headers=["Content-Type", "Authorization"])
-@cross_origin(headers=["Access-Control-Allow-Origin", "http://localhost"])
 @requires_auth
 def private():
     """A valid access token is required to access this route
@@ -170,7 +308,6 @@ def private():
 
 @APP.route("/private-scoped")
 @cross_origin(headers=["Content-Type", "Authorization"])
-@cross_origin(headers=["Access-Control-Allow-Origin", "http://localhost"])
 @requires_auth
 def private_scoped():
     """A valid access token and an appropriate scope are required to access this route

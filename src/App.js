@@ -19,7 +19,8 @@ function App() {
     (async() => {
       try {
         const tempAccessToken = await getAccessTokenSilently({
-          audience: `https://dev-artsite.eu.auth0.com/api/v2/`,
+          audience: "testapi",
+          //audience: `https://dev-artsite.eu.auth0.com/api/v2/`,
           scope: "read:current_user",
         });
         setAccessToken(tempAccessToken);
@@ -40,14 +41,23 @@ function App() {
               Authorization: `Bearer ${accessToken}`,
             },
           });
-          setPrivateData(tempPrivateData);
+
+          const tempPrivateDataJson = await tempPrivateData.json()
+          setPrivateData(tempPrivateDataJson);
         }
         catch (e) {
           console.log(e.message);
         }
       })()
     }
+
   }, [accessToken])
+
+  useEffect(() => {
+    if(privateData != null) {
+      console.log(privateData)
+    }
+  }, [privateData])
 
   return (
     <div className="App">
@@ -67,9 +77,9 @@ function App() {
         </a>
 
         <p>The current time is {currentTime}.</p>
-        {/* {privateData && 
-          <p>Private data: {privateData}</p>
-        } */}
+        {privateData && 
+          <p>Private data: {privateData.message}</p>
+        }
         <LogoutButton/>
         <LoginButton/>
 
