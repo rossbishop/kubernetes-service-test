@@ -34,6 +34,7 @@ function App() {
 
   useEffect(() => {
     if(accessToken != null){
+      console.log(accessToken);
       (async() => {
         try {
           const tempPrivateData = await fetch('/api/private', {

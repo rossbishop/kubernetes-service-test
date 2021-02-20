@@ -17,6 +17,8 @@ from time import gmtime, strftime
 import boto3
 import uuid
 
+import sys
+
 ENV_FILE = find_dotenv()
 if ENV_FILE:
     load_dotenv(ENV_FILE)
@@ -149,7 +151,6 @@ def requires_auth(f):
                         "description": "Unable to find appropriate key"}, 401)
     return decorated
 
-
 # REST API
 
 # LOOK INTO SANITIZATION OF INCOMING DATA
@@ -158,93 +159,122 @@ def requires_auth(f):
 @cross_origin(headers=["Content-Type", "Authorization"])
 def getProject(id):
     if request.method == "GET":
+        
+        # Retrieve requested item from database
         response = table.get_item(
             TableName=tableName,
             Key={'id':str(id)}
         )
-        return {
-            'isBase64Encoded': "false",
-            'statusCode': 200,
-            'headers':{
-                "Content-Type": "application/json"
-            },
-            'body': json.dumps(response['Item'])
-        }
-    else:
-        return {"UWOTSUN": "That ain't right"}
+
+        print("DB ITEM: " + str(response), flush=True)
+
+        # Check item exists, if it does return it, otherwise error
+        if 'Item' in response:
+            return {
+                'isBase64Encoded': "false",
+                'statusCode': 200,
+                'headers':{
+                    "Content-Type": "application/json"
+                },
+                'body': json.dumps(response['Item'])
+            }
+        else:
+            return {
+                'isBase64Encoded': "false",
+                'statusCode': 404,
+                'headers':{
+                    "Content-Type": "application/json"
+                },
+                'body': {"Message" : "Resource not found"}
+            }
 
 @APP.route('/project/<id>', methods=["PUT", "DELETE"])
 @cross_origin(headers=["Content-Type", "Authorization"])
 @requires_auth
 def modifyProject(id):
-    if request.method == "PUT":
-        response = table.get_item(
-            TableName=tableName,
-            Key={'id':str(id)}
-        )
-    
-        request.get_data()
-        requestData = request.json
 
-        # store the current time in a human readable format in a variable
-        now = strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime())
+    # Retrieve requested item from database
+    response = table.get_item(
+        TableName=tableName,
+        Key={'id':str(id)}
+    )
 
-        #print(response['Item']['owner'])
-
-        # Then check the owner name is the same as that in the access token
-        #if response['Item']['owner'] == user['Username']:
-        
-        # Make the desired changes
-        response = table.update_item(
-            TableName=tableName,
-            Key={'id':str(id)},
-            UpdateExpression="set projectName = :pn, projectDescription = :pd, updatedAt = :t",
-            ExpressionAttributeValues={
-                ':pn': requestData['projectName'],
-                ':pd': requestData['projectDescription'],
-                ':t': now
-            },
-            ReturnValues="UPDATED_NEW"
-        )
+    # Check item exists, if not, error
+    if not 'Item' in response:
         return {
             'isBase64Encoded': "false",
-            'statusCode': 200,
+            'statusCode': 404,
             'headers':{
                 "Content-Type": "application/json"
             },
-            'body': json.dumps(response)
+            'body': {"Message" : "Resource not found"}
         }
-    elif request.method == "DELETE":
-        # First get the project
-        response = table.get_item(
-            TableName=tableName,
-            Key={'id':str(id)}
-        )
-    
-        # Then check the owner name is the same as that in the access token
-        #if response['Item']['owner'] == user['Username']:
 
-        # Make the deletion
-        response = table.delete_item(
-            TableName=tableName,
-            Key={'id':str(id)}
-        )
-        return {
-            'isBase64Encoded': "false",
-            'statusCode': 200,
-            'headers':{
-                "Content-Type": "application/json"
-            },
-            'body': json.dumps(response)
-        }
+    # Get user id of user making request
+    uid = _request_ctx_stack.top.current_user['sub']
+
+    # Store the current time in a human readable format in a variable
+    now = strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime())
+
+    # If user making request owns item, then allow change, else return error
+    if uid == response['Item']['owner']:
+        if request.method == "PUT":
+            
+            # Grab data to be updated
+            request.get_data()
+            requestData = request.json
+
+            # Make the desired changes
+            response = table.update_item(
+                TableName=tableName,
+                Key={'id':str(id)},
+                UpdateExpression="set projectName = :pn, projectDescription = :pd, updatedAt = :t",
+                ExpressionAttributeValues={
+                    ':pn': requestData['projectName'],
+                    ':pd': requestData['projectDescription'],
+                    ':t': now
+                },
+                ReturnValues="UPDATED_NEW"
+            )
+            return {
+                'isBase64Encoded': "false",
+                'statusCode': 200,
+                'headers':{
+                    "Content-Type": "application/json"
+                },
+                'body': json.dumps(response)
+            }
+        elif request.method == "DELETE":
+            # Make the deletion
+            response = table.delete_item(
+                TableName=tableName,
+                Key={'id':str(id)}
+            )
+            return {
+                'isBase64Encoded': "false",
+                'statusCode': 200,
+                'headers':{
+                    "Content-Type": "application/json"
+                },
+                'body': json.dumps(response)
+            }
     else:
-        return {"UWOTSUN": "That ain't right"}
+        return {
+            'isBase64Encoded': "false",
+            'statusCode': 403,
+            'headers':{
+                "Content-Type": "application/json"
+            },
+            'body': {"Message" : "You do not have permissions to make changes to this resource"}
+        }
 
 @APP.route('/project', methods=["POST"])
 @cross_origin(headers=["Content-Type", "Authorization"])
 @requires_auth
 def createProject():
     if request.method == "POST":
+
+        # Grab data for new entry
         request.get_data()
         requestData = request.json
 
@@ -252,7 +282,7 @@ def createProject():
         now = strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime())
 
         id = uuid.uuid4()
-        owner = "Jeff"
+        owner = _request_ctx_stack.top.current_user['sub']
         projectName = requestData['projectName']
         projectDescription = requestData['projectDescription']
         contentType = "project"
@@ -278,8 +308,8 @@ def createProject():
             },
             'body': str(id)
         }
-    else:
-        return {"UWOTSUN": "That ain't right"}
+
+######################################
 
 # Controllers API
 
@@ -320,6 +350,8 @@ def private_scoped():
         "description": "You don't have access to this resource"
     }, 403)
 
+
+######################################
 
 if __name__ == "__main__":
     APP.run(host="0.0.0.0", port=env.get("PORT", 3010))
